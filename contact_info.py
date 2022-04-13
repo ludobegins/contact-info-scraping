@@ -30,8 +30,7 @@ class BanDetectionPolicyNotText(BanDetectionPolicy):
             return True
 
 def get_urls(tag, n, language):
-    tags = tag[0] + " " + tag[1]
-    urls = [url for url in search(tags, stop=n, lang=language)][:n]
+    urls = [url for url in search(tag, stop=n, lang=language)][:n]
     return urls
 
 class MailSpider(scrapy.Spider):
@@ -56,6 +55,7 @@ class MailSpider(scrapy.Spider):
             
         html_text = str(response.text)
         mail_list = re.findall(r'([a-zA-Z0-9+._-]+@[a-zA-Z0-9._-]+\.[a-zA-Z0-9_-]+)', html_text)
+        #mail_list = re.findall(r'^(([^<>()[\]\\.,;:\s@"]+(\.[^<>()[\]\\.,;:\s@"]+)*)|(".+"))@((\[[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\])|(([a-zA-Z\-0-9]+\.)+[a-zA-Z]{2,}))$', html_text)
         dic = {'email': mail_list, 'link': str(response.url)}
         df = pd.DataFrame(dic)
         
@@ -117,18 +117,22 @@ def get_info(tag, n, language, path, reject=[]):
     df.columns = ['email', 'link']
     df = df.drop_duplicates(subset='email')
     #df = df[df['email'].astype(str).str.contains(f"{tag[0]}", na=False)] # só guardar os que contém nome da empresa no email - tentativa de limpar emails sujos
+    df = df[~df['email'].astype(str).str.contains("png", na=False)]
+    df = df[~df['email'].astype(str).str.contains("jpg", na=False)]
+    df = df[~df['email'].astype(str).str.contains("gif", na=False)]
+    df = df[~df['email'].astype(str).str.contains("img", na=False)]
+    df = df[~df['email'].astype(str).str.contains(".js", na=False)]
+    df = df[~df['email'].astype(str).str.contains("slick-carousel", na=False)]
     df = df.reset_index(drop=True)
     df.to_csv(path, mode='w', header=True)
     
     return df
 
 def main():
-    bad_words = ['twitter','facebook','instagram']
-
-    for i in range(2):
-        empresa = empresas_aux.lista_empresas[i]
-        df = get_info([empresa,"sustentabilidade"], 5, 'pt-BR', f'{empresa}.csv', reject=bad_words)
-        print(df.head(10))
+    bad_words = ['twitter','facebook','instagram','youtube']
+    termo_pesquisa = input("Com qual termo de pesquisa deseja procurar emails? \n")
+    df = get_info(termo_pesquisa, 10, 'pt-BR', f'{termo_pesquisa}.csv', reject=bad_words)
+    print(df.head(10))
 
 if __name__ == '__main__':
     main()
