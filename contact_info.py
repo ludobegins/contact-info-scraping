@@ -58,9 +58,8 @@ class MailSpider(scrapy.Spider):
         #mail_list = re.findall(r'^(([^<>()[\]\\.,;:\s@"]+(\.[^<>()[\]\\.,;:\s@"]+)*)|(".+"))@((\[[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\])|(([a-zA-Z\-0-9]+\.)+[a-zA-Z]{2,}))$', html_text)
         dic = {'email': mail_list, 'link': str(response.url)}
         df = pd.DataFrame(dic)
-        
         df.to_csv(self.path, mode='a', header=False)
-        df.to_csv(self.path, mode='a', header=False)
+        #df.to_csv(self.path, mode='a', header=False)
 
 
 def ask_user(question):
@@ -98,7 +97,7 @@ def run_spider(spider,start_urls,path,reject):
     if result is not None:
         raise result  """
 
-def get_info(tag, n, language, path, reject=[]):
+def get_info(tag, n, language, path, termo_obri, reject=[]):
     
     create_file(path)
     df = pd.DataFrame(columns=['email', 'link'], index=[0])
@@ -108,7 +107,10 @@ def get_info(tag, n, language, path, reject=[]):
     google_urls = get_urls(tag, n, language)
     print(google_urls)
     print('Searching for emails...')
-    process = CrawlerProcess() #{'USER_AGENT': 'Mozilla/5.0'})
+    headers = {
+        'User-Agent': 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/79.0.3945.88 Safari/537.36'
+    }
+    process = CrawlerProcess(headers)
     process.crawl(MailSpider, start_urls=google_urls, path=path, reject=reject)
     process.start()
     
@@ -117,12 +119,11 @@ def get_info(tag, n, language, path, reject=[]):
     df.columns = ['email', 'link']
     df = df.drop_duplicates(subset='email')
     #df = df[df['email'].astype(str).str.contains(f"{tag[0]}", na=False)] # só guardar os que contém nome da empresa no email - tentativa de limpar emails sujos
-    df = df[~df['email'].astype(str).str.contains("png", na=False)]
-    df = df[~df['email'].astype(str).str.contains("jpg", na=False)]
-    df = df[~df['email'].astype(str).str.contains("gif", na=False)]
-    df = df[~df['email'].astype(str).str.contains("img", na=False)]
-    df = df[~df['email'].astype(str).str.contains(".js", na=False)]
-    df = df[~df['email'].astype(str).str.contains("slick-carousel", na=False)]
+    termos_cancelados = ["png","jpg","gif","img",".js","slick-carousel","react"]
+    for tc in termos_cancelados:
+        df = df[~df['email'].astype(str).str.contains(tc, na=False)]
+    if termo_obri != "*":
+        df = df[df['email'].astype(str).str.contains(termo_obri, na=False)]
     df = df.reset_index(drop=True)
     df.to_csv(path, mode='w', header=True)
     
@@ -131,7 +132,13 @@ def get_info(tag, n, language, path, reject=[]):
 def main():
     bad_words = ['twitter','facebook','instagram','youtube']
     termo_pesquisa = input("Com qual termo de pesquisa deseja procurar emails? \n")
-    df = get_info(termo_pesquisa, 10, 'pt-BR', f'{termo_pesquisa}.csv', reject=bad_words)
+    num_urls = int(input("Quantas URLs do Google deseja scrape?\n"))
+    if input("Algum termo específico deve estar nos emails? s/n \n") == "s":
+        termo_obri = input("Qual termo? \n")
+    else:
+        termo_obri = "*"
+    path1 = r'C:\gitrepos\contact-info-scraping\contatos\''
+    df = get_info(termo_pesquisa, num_urls, 'pt-BR', path1+f'{termo_pesquisa}_{num_urls}.csv', termo_obri, bad_words)
     print(df.head(10))
 
 if __name__ == '__main__':
